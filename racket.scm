@@ -56,7 +56,7 @@
           (discrete-histogram 
            (buck l) #:color 1) (discrete-histogram 
                                 (buck (take l 1)) #:color 2) )
-         #:out-file (string-append title ".png")
+         #:out-file (string-append "images/" title ".png")
          #:width 1200 
          #:y-min (max 0 (- min-y (* 0.33 (- max-y min-y))))
          #:x-label "Athlete"
