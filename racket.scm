@@ -9,13 +9,6 @@
       (car l)
   (f (car l) (reduce f (cdr l)))))
 
-(define example-html 
-  (string-append "<html><head><title></title><title>whatever</title></head>"
-                 "<body> <a href=\"url\">link</a><div class='bla' id='outer'><p align=center id='theid'>"
-                 "<ul compact style=\"aa\"> <p>BLah<!-- comment <comment> -->"
-                 " <i> italic <b> bold <div id='inner' class='bla'>some inner content that i want</div> ened</i> still &lt; bold </b>"
-                 "</body><P> But not<p>nested</p> done yet...</p></div>"))
-
 (define events '(("100" "100 Metres") ("200" "200 Metres") ("400" "400 Metres") ("800" "800 Metres") ("1000" "1000 Metres") 
                                       ("1500" "1500 Metres") ("MILE" "Mile") ("3000" "3000 Metres") ("5000" "5000 Metres") ("10K" "10,000 Metres")
                                       ("10RR" "10 Kilometres") ("15RR" "15 Kilometres") ("20RR" "20 Kilometres") ("HMAR" "Half Marathon") 
@@ -23,7 +16,7 @@
                                       ("3KSC" "3000 Metres Steeplechase") ("110H" "110 Metres Hurdles") ("400H" "400 Metres Hurdles") 
                                     ;  ("HJ" "High Jump") ("PV" "Pole Vault") ("LJ" "Long Jump") ("TJ" "Tripple Jump") ("SP" "Shot Put")
                                     ;  ("DT" "Discus Throw") ("HT" "Hammer Throw") ("JT" "Javelin Throw") 
-                                      ("20KR" "20 Kilometres Race Walk") ("50KR" "50 Kilometres Race Walk") ))
+                                      ("20KR" "20 Kilometres Race Walk") ("50KW" "50,000 Metres Walk") ("50KR" "50 Kilometres Race Walk") ))
 
 (define base-url "http://www.iaaf.org/statistics/toplists/inout=o/age=n/season=0/sex=M/all=y/legal=A/disc=_EVENT_/detail.html")
 
@@ -46,7 +39,7 @@
       empty
       (cons (vector (cadar l) (caar l)) (buck (cdr l)))))
 
-(define (plot-list l title y-label)  
+(define (plot-list l title y-label ymax)  
   (begin 
   (let ([y-values (map (lambda (entry) (car entry)) l)])
     (let ([max-y (reduce max y-values)])
@@ -58,7 +51,9 @@
                                 (buck (take l 1)) #:color 2) )
          #:out-file (string-append "images/" title ".png")
          #:width 1200 
-         #:y-min (max 0 (- min-y (* 0.33 (- max-y min-y))))
+         #:y-min (if ymax 0
+                     (max 0 (- min-y (* 0.33 (- max-y min-y)))))
+         #:y-max (if ymax ymax max-y)
          #:x-label "Athlete"
          #:y-label y-label
          #:title title ))))))
@@ -173,22 +168,47 @@
             (make-unique-intermediate (cdr times) (append results (list (car times)))))))
   (make-unique-intermediate l empty))
 
-(define (loop-plot l)
+(define r (take (make-unique (get-results-from-url (regexp-replace #rx"_EVENT_" base-url "100"))) 50))
+
+
+(define (get-results-list l)
   (begin 
     (if (empty? l)
         empty
-        (let ([r (take (make-unique (get-results-from-url (regexp-replace #rx"_EVENT_" base-url (caar l)))) 12)])
-          (append (list (plot-list r (cadar l) "Time (s)")) (list (plot-list (diff-list r) (string-append (cadar l) " % Improvement over next best athlete") "% Improvement"))
-                (loop-plot (cdr l)))))))
-  
-(define r (take (make-unique (get-results-from-url (regexp-replace #rx"_EVENT_" base-url "400"))) 50))
+        (append (list(take (make-unique (get-results-from-url (regexp-replace #rx"_EVENT_" base-url (caar l)))) 12))        
+                (get-results-list (cdr l))))))
+
+(define result-list (get-results-list '(("100" "100") ("200" "200"))))
 
 (define (diff-list l)
   (if (empty? (cdr l))
       empty
       (cons (append (list(* 100 (/ (- (caar (cdr l)) (caar l)) (caar (cdr l)))) ) (cdar l)) (diff-list (cdr l)))))
+
+
+(define (get-improvement-list l)
+  (if (empty? l)
+      empty
+  (cons (diff-list (car l)) (get-improvement-list (cdr l)))))
+
+;(define improvement-list (get-improvement-list result-list))
+
+;(define (adjust-improvement-list l)
+;  (let ([dev (std-dev (map (lambda (entry) (car entry))  (car l)))])
+;    (map
+
+(define (loop-plot l)
+  (begin 
+    (if (empty? l)
+        empty
+        (let ([r (take (make-unique (get-results-from-url (regexp-replace #rx"_EVENT_" base-url (caar l)))) 12)])
+          (append (list (plot-list r (cadar l) "Time (s)" #f)) (list (plot-list (diff-list r) (string-append (cadar l) " % Improvement over next best athlete") "% Improvement" 2))
+                (loop-plot (cdr l)))))))
+  
+
   
 
 
-;(loop-plot '(("50KW" "5000 Metres")))
+;(loop-plot '(("100" "100")))
+
 (loop-plot events )
